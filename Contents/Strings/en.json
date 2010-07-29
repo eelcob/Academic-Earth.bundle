@@ -1,0 +1,21 @@
+{
+  "TopRated":                 "Top Rated",
+  "Universities":             "Universities",
+  "Subjects":                 "Subjects",
+  "Instructors":              "Instructors",
+  "Playlists":                "Playlists",
+  "Featured":                 "Featured",
+  "MostViewed":               "Most Viewed",
+  "Search":                   "Search...",
+  
+  "TopRatedC":                "Top Rated Courses",
+  "TopRatedL":                "Top Rated Lectures",
+  "TopRatedI":                "Top Rated Instructors",
+  "TopRatedP":                "Top Rated Playlists",
+
+  "SearchPrompt":             "Search Academic Earth",
+  
+  "NextPage":                 "Next Page...",
+  
+  "AcademicEarth":            "Academic Earth"
+}
