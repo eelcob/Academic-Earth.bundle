@@ -25,7 +25,7 @@ XPATH_VIDEO_THUMBS    = "//div[@class='video-results']/ol/li/div[@class='thumb']
 ####################################################################################################
 
 class AEMenuContainer(MediaContainer):
-  def __init__(self, art="art-default.png", viewGroup="Menu", title1=None, title2=None, noHistory=False, replaceParent=False):
+  def __init__(self, art="art-default.jpg", viewGroup="Menu", title1=None, title2=None, noHistory=False, replaceParent=False):
     if title1 is None:
       title1 = _L("AcademicEarth")
     MediaContainer.__init__(self, art, viewGroup, title1, title2, noHistory, replaceParent)
@@ -33,7 +33,7 @@ class AEMenuContainer(MediaContainer):
 ####################################################################################################
 
 def Start():
-  Plugin.AddRequestHandler(AE_PLUGIN_PREFIX, HandleRequest, _L("AcademicEarth"), "icon-default.png", "art-default.png")
+  Plugin.AddRequestHandler(AE_PLUGIN_PREFIX, HandleRequest, _L("AcademicEarth"), "icon-default.png", "art-default.jpg")
   Plugin.AddViewGroup("Menu", viewMode="List", contentType="items")
   Plugin.AddViewGroup("Video", viewMode="InfoList", contentType="video")
 
