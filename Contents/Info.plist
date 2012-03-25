@@ -16,8 +16,6 @@
 	<string>hook</string>
 	<key>CFBundleVersion</key>
 	<string>1.0</string>
-	<key>PlexClientPlatforms</key>
-	<string>MacOSX,LGTV</string>
 	<key>PlexFrameworkVersion</key>
 	<string>2</string>
 	<key>PlexAudioCodec</key>
@@ -28,8 +26,6 @@
 	<array>
 		<string>FLV</string>
 	</array>
-	<key>PlexPluginDebug</key>
-	<string>1</string>
 	<key>PlexClientPlatforms</key>
 	<string>*</string>
 	<key>PlexPluginMode</key>
