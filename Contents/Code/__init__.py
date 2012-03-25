@@ -34,7 +34,7 @@ def MainMenu():
   oc.add(DirectoryObject(key = Callback(Subjects), title = 'Subjects'))
   oc.add(DirectoryObject(key = Callback(Universities), title = 'Universities'))
   oc.add(DirectoryObject(key = Callback(Instructors), title = 'Instructors'))
-  oc.add(SearchDirectoryObject(identifier="com.plexapp.plugins.academicearth", title = "Search", summary = "Search Description", prompt = "Search Prompt", thumb = R(ICON_SEARCH)))
+  oc.add(SearchDirectoryObject(identifier="com.plexapp.plugins.academicearth", title = "Search...", prompt = "Search for Videos", thumb = R(ICON_SEARCH)))
   return oc
 
 ####################################################################################################
@@ -43,9 +43,14 @@ def Subjects():
   oc = ObjectContainer(title2 = "Subjects")
   page = HTML.ElementFromURL('http://academicearth.org/subjects/')
 
-  for subject in page.xpath("//div[@class='institution-list']//li/a"):
-    title = subject.text
+  for subject in page.xpath("//a[@class='subj-links']"):
+    title = subject.xpath(".//div/text()")[0].strip()
     url = BASE_URL + subject.get('href')
+
+    # We don't support Course For Credit
+    if '/CFC' in url:
+      continue
+
     oc.add(DirectoryObject(key = Callback(Subject, url = url, title = title), title = title))
 
   return oc
@@ -54,15 +59,12 @@ def Subject(url, title):
   oc = ObjectContainer(title2 = title)
   page = HTML.ElementFromURL(url)
     
-  for course in page.xpath("//div[@class='video-results']//div[@class='info']/.."):
+  for course in page.xpath("//div[@id='tab_content']//div[@class='info']/.."):
     lectures_url = BASE_URL + course.xpath(".//a[@class='thumb']")[0].get('href')
-    title = course.xpath(".//h3/a/text()")[0].strip()
-    institution = ''.join(course.xpath(".//h4//text()")).strip()
-    speakers = ''.join(course.xpath(".//h5//text()")).strip()
+    title = course.xpath(".//img")[0].get('alt')
     thumb = BASE_URL + course.xpath(".//div[@class='thumb']//img")[0].get('src')
+    summary = course.xpath(".//div[@class = 'info']//div/a/text()")[0]
 
-    summary = "Lectures: %s\n\n%s" % (speakers, institution)
-      
     oc.add(DirectoryObject(
       key = Callback(Lectures, url = lectures_url, title = title), 
       title = title, 
@@ -102,9 +104,10 @@ def Universities():
   oc = ObjectContainer(title2 = "Universities")
   page = HTML.ElementFromURL('http://academicearth.org/universities/')
 
-  for university in page.xpath("//div[@class='institution-list']//li"):
-    url = BASE_URL + university.xpath(".//a")[0].get('href')
-    title = university.xpath(".//a/text()")[0]
+  university_section = page.xpath("//div[contains(@class, 'box-border-main')]")[0]
+  for university in university_section.xpath(".//a[@class='subj-links']"):
+    url = BASE_URL + university.get('href')
+    title = university.xpath(".//div/text()")[0].strip()
     oc.add(DirectoryObject(key = Callback(UniversitySubjects, url = url), title = title))
     
   return oc
@@ -113,10 +116,9 @@ def UniversitySubjects(url):
   oc = ObjectContainer(title2 = "Subjects")
   page = HTML.ElementFromURL(url)
     
-  for subject in page.xpath("//div[@class='results-side']//li"):
+  for subject in page.xpath("//div[@class='tab-container']//li"):
     url = BASE_URL + subject.xpath(".//a")[0].get('href')
     title = subject.xpath(".//a/text()")[0]
-    title = title[:title.index('(')].strip()
     oc.add(DirectoryObject(key = Callback(Subject, url = url, title = title), title = title))
     
   return oc
@@ -127,10 +129,30 @@ def Instructors():
   oc = ObjectContainer(title2 = "Instructors")
   page = HTML.ElementFromURL('http://academicearth.org/speakers/')
     
-  for instructor in page.xpath("//ul[@class='professors-list']//li/a"):
+  for instructor_initial in page.xpath("//div[@class='tab-container']//a[contains(@class, 'tab-details-link')]"):
+    url = BASE_URL + instructor_initial.get('href')
+    title = instructor_initial.text
+
+    if 'All Names' in title:
+      continue
+
+    oc.add(DirectoryObject(key = Callback(InstructorsOfLetter, url = url, title = title), title = title))
+
+  return oc
+
+def InstructorsOfLetter(title, url):
+  oc = ObjectContainer(title2 = title)
+  page = HTML.ElementFromURL(url)
+
+  instructor_section = page.xpath("//div[@class='tab-container']/div")[2]
+  for instructor in instructor_section.xpath(".//a"):
     url = BASE_URL + instructor.get('href')
-    title = instructor.text
-    oc.add(DirectoryObject(key = Callback(InstructorsVideos, url = url, instructor = title), title = title))
+    title = instructor.xpath('.//div/text()')[0]
+    summary = instructor.xpath('.//div/text()')[1]
+    oc.add(DirectoryObject(
+      key = Callback(InstructorsVideos, url = url, instructor = title),
+      title = title,
+      summary = summary))
 
   return oc
 
@@ -153,5 +175,9 @@ def InstructorsVideos(url, instructor):
       title = episode_title,
       summary = summary,
       thumb = thumb))
+
+  # It seems that some advertised lecturers don't actually have any videos available
+  if len(oc) == 0:
+    return MessageContainer("Error", "There are no lecutures currently available.")
 
   return oc

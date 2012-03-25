@@ -10,6 +10,10 @@ ObjectContainer.art = R('art-default.jpg')
 def Search(query):
   oc = ObjectContainer()
   SearchItems(oc, query)
+
+  if len(oc) == 0:
+    return MessageContainer("Error", "No videos were found.")
+
   return oc
 
 ####################################################################################################
@@ -21,11 +25,14 @@ def SearchItems(oc, query, page = 1, max_items = 10):
   search_page = HTML.ElementFromURL(url)
   search_results = search_page.xpath("//div[@id='results-container-std']//li[@class='clearfix']")
 
+  if len(search_results) == 0:
+    return
+
   for item in search_results:
 
     if len(oc) == max_items:
       return
-    Log(HTML.StringFromElement(item))
+
     url = BASE_URL + item.xpath(".//a[@class='thumb']")[0].get('href')
     if url.startswith(BASE_URL + "/courses/") == True:
       continue
