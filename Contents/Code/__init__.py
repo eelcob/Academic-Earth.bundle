@@ -4,6 +4,8 @@ ICON = 'icon-default.png'
 ICON_SEARCH = 'icon-search.png'
 
 BASE_URL = "http://www.academicearth.org"
+SPEAKER_LECTURES = '%s/speakers/ajax_speakers_get_more_lectures/%%s/%%d' % BASE_URL
+
 RE_INDEX = Regex("Lecture (?P<index>[0-9]+) -")
 
 ####################################################################################################
@@ -48,12 +50,12 @@ def Subjects():
     if '/onlinedegreeprograms' in url:
       continue
 
-    oc.add(DirectoryObject(key = Callback(Subject, url=url, title=title), title=title))
+    oc.add(DirectoryObject(key = Callback(Subject, title=title, url=url), title=title))
 
   return oc
 
 ####################################################################################################
-def Subject(url, title, page=1):
+def Subject(title, url, page=1):
 
   oc = ObjectContainer(title2 = title)
   content = HTML.ElementFromURL('%s/page:%d' % (url, page))
@@ -80,7 +82,7 @@ def Subject(url, title, page=1):
       ))
 
   if len(content.xpath('//a/span[text()="next page"]')) > 0:
-    oc.add(DirectoryObject(key = Callback(Subject, url=url, title=title, page=page+1), title='Next ...'))
+    oc.add(DirectoryObject(key = Callback(Subject, title=title, url=url, page=page+1), title='Next ...'))
 
   return oc
 
@@ -136,7 +138,7 @@ def UniversitySubjects(url):
   for subject in page.xpath("//div[@class='tab-container']//li"):
     url = BASE_URL + subject.xpath(".//a")[0].get('href')
     title = subject.xpath(".//a/text()")[0]
-    oc.add(DirectoryObject(key = Callback(Subject, url = url, title = title), title = title))
+    oc.add(DirectoryObject(key = Callback(Subject, title=title, url=url), title=title))
 
   return oc
 
@@ -153,27 +155,30 @@ def Instructors():
     if 'All Names' in title:
       continue
 
-    oc.add(DirectoryObject(key = Callback(InstructorsOfLetter, url = url, title = title), title = title))
+    oc.add(DirectoryObject(key = Callback(InstructorsOfLetter, title=title, url=url), title=title))
 
   return oc
 
 ####################################################################################################
-def InstructorsOfLetter(title, url):
+def InstructorsOfLetter(title, url, page=1):
 
   oc = ObjectContainer(title2 = title)
-  page = HTML.ElementFromURL(url)
-  instructor_section = page.xpath("//div[@class='tab-container']/div")[2]
+  content = HTML.ElementFromURL('%s/page:%d' % (url, page))
+  instructor_section = content.xpath("//div[@class='tab-container']/div")[2]
 
   for instructor in instructor_section.xpath(".//a"):
-    url = BASE_URL + instructor.get('href')
-    title = instructor.xpath('.//div/text()')[0]
+    instructor_url = BASE_URL + instructor.get('href')
+    instructor_title = instructor.xpath('.//div/text()')[0]
     summary = instructor.xpath('.//div/text()')[1]
 
     oc.add(DirectoryObject(
-      key = Callback(InstructorsVideos, url = url, instructor = title),
-      title = title,
+      key = Callback(InstructorsVideos, url=instructor_url, instructor=instructor_title),
+      title = instructor_title,
       summary = summary
     ))
+
+  if len(content.xpath('//a/span[text()="next page"]')) > 0:
+    oc.add(DirectoryObject(key = Callback(InstructorsOfLetter, title=title, url=url, page=page+1), title='Next ...'))
 
   return oc
 
@@ -181,24 +186,46 @@ def InstructorsOfLetter(title, url):
 def InstructorsVideos(url, instructor):
 
   oc = ObjectContainer(title2 = instructor)
-  page = HTML.ElementFromURL(url)
+  content = HTML.ElementFromURL(url)
 
-  for lecture in page.xpath("//div[@class='results-list']//ol[@class='child-lists']/li"):
-    url = lecture.xpath(".//a")[0].get('href')
-    if url.startswith("/lectures/") == False:
-      continue
+  for course in content.xpath("//h3[text()='Courses']/following-sibling::ol[1]/li"):
+    course_url = BASE_URL + course.xpath(".//a")[0].get('href')
+    course_title = course.xpath(".//div[@class='description']/h4/a/text()")[0]
+    summary = course.xpath(".//span[@class='org']/text()")[0]
+    thumb = BASE_URL + course.xpath(".//div[@class='description-thumb']//img")[0].get('src')
 
-    url = BASE_URL + url
-    episode_title = lecture.xpath(".//img[contains(@class, 'thumb')]")[0].get('alt')
-    summary = lecture.xpath(".//span[@class='org']/text()")[0]
-    thumb = BASE_URL + lecture.xpath(".//img[contains(@class, 'thumb')]")[0].get('src')   
-
-    oc.add(EpisodeObject(
-      url = url,
-      title = episode_title,
+    oc.add(DirectoryObject(
+      key = Callback(Lectures, url=course_url, title=course_title),
+      title = course_title,
       summary = summary,
       thumb = thumb
     ))
+
+  name = url.rsplit('/',1)[1]
+  start = 0
+  items = 20
+
+  more = True
+  while more is True:
+    url = SPEAKER_LECTURES % (name, start*items)
+    start = start+1
+    content = HTML.ElementFromURL(url)
+    more = False
+
+    for lecture in content.xpath("//ol/li"):
+      lecture_url = BASE_URL + lecture.xpath(".//a")[0].get('href')
+      episode_title = lecture.xpath(".//div[@class='description']/h4/a/text()")[0]
+      summary = lecture.xpath(".//span[@class='org']/text()")[0].strip(' /')
+      thumb = BASE_URL + lecture.xpath(".//img[contains(@class, 'thumb')]")[0].get('src')
+
+      oc.add(EpisodeObject(
+        url = lecture_url,
+        title = episode_title,
+        summary = summary,
+        thumb = thumb
+      ))
+
+      more = True
 
   # It seems that some advertised lecturers don't actually have any videos available
   if len(oc) == 0:
