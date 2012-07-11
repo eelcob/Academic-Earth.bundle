@@ -63,9 +63,12 @@ def Subject(title, url, page=1):
   for course in content.xpath("//div[@id='tab_content']//div[@class='info']/.."):
     course_url = BASE_URL + course.xpath(".//a[@class='thumb']")[0].get('href')
     course_title = course.xpath(".//img[not(@class='play-icon')]")[0].get('alt')
-    thumb = BASE_URL + course.xpath(".//div[@class='thumb']//img[not(@class='play-icon')]")[0].get('src')
+    thumb = course.xpath(".//div[@class='thumb']//img[not(@class='play-icon')]")[0].get('src')
+    if thumb.find('http://') == -1:
+        thumb = BASE_URL + thumb
+   
     summary = course.xpath(".//div[@class='info']//div/a[1]")[0].text
-
+	
     if '/courses/' in course_url:
       oc.add(DirectoryObject(
         key = Callback(Lectures, url=course_url, title=title),
