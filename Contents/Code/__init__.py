@@ -99,7 +99,10 @@ def Lectures(url, title):
     lecture_url = BASE_URL + lecture.xpath(".//a")[0].get('href')
     episode_title = lecture.xpath(".//div[@class='description']/h4/a/text()")[0]
     summary = ''.join(lecture.xpath(".//div[@class='description']/p/text()")).strip()
-    thumb = BASE_URL + lecture.xpath(".//img[contains(@class, 'thumb')]")[0].get('src')
+    thumb = lecture.xpath(".//img[contains(@class, 'thumb')]")[0].get('src')
+    if thumb.find('http://') == -1:
+        thumb = BASE_URL + thumb	
+
 
     try: index = int(RE_INDEX.search(episode_title).group('index'))
     except: index = None
@@ -233,5 +236,5 @@ def InstructorsVideos(url, instructor):
   # It seems that some advertised lecturers don't actually have any videos available
   if len(oc) == 0:
     return MessageContainer("Error", "There are no lecutures currently available.")
-
+      
   return oc
