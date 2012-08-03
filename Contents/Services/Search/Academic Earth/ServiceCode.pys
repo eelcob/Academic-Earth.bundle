@@ -1,7 +1,7 @@
 import re
 
-BASE_URL = 'http://academicearth.org'
-SEARCH_URL = 'http://academicearth.org/lectures/search/%s/page:%s'
+BASE_URL = 'http://www.academicearth.org'
+SEARCH_URL = 'http://www.academicearth.org/lectures/search/%s'
 
 ObjectContainer.art = R('art-default.jpg')
 
@@ -9,29 +9,15 @@ ObjectContainer.art = R('art-default.jpg')
 
 def Search(query):
   oc = ObjectContainer()
-  SearchItems(oc, query)
-
-  if len(oc) == 0:
-    return MessageContainer("Error", "No videos were found.")
-
-  return oc
-
-####################################################################################################
-
-def SearchItems(oc, query, page = 1, max_items = 10):
+#http://www.academicearth.org/lectures/search/test/
+#http://www.academicearth.org/lectures/search/test/page:1
 
   # Compute the URL and download the HTML
-  url = SEARCH_URL % (String.Quote(query), str(page))
+  url = SEARCH_URL % String.Quote(query)
   search_page = HTML.ElementFromURL(url)
   search_results = search_page.xpath("//div[@id='results-container-std']//li[@class='clearfix']")
 
-  if len(search_results) == 0:
-    return
-
   for item in search_results:
-
-    if len(oc) == max_items:
-      return
 
     url = BASE_URL + item.xpath(".//a[@class='thumb']")[0].get('href')
     if url.startswith(BASE_URL + "/courses/") == True:
@@ -39,7 +25,9 @@ def SearchItems(oc, query, page = 1, max_items = 10):
 
     title = item.xpath(".//h4/a/text()")[0]
     description = ''.join(item.xpath(".//p[@class='description']/text()")[0]).strip()
-    thumb = BASE_URL + item.xpath(".//img[contains(@class, 'thumb')]")[0].get('src')
+    thumb = item.xpath(".//img[contains(@class, 'thumb')]")[0].get('src')
+    if thumb.find('http://') == -1:
+      thumb = BASE_URL + thumb
 
     oc.add(VideoClipObject(
       url = url,
@@ -47,4 +35,4 @@ def SearchItems(oc, query, page = 1, max_items = 10):
       summary = description,
       thumb = thumb))
 
-  SearchItems(oc, query, page + 1, max_items)
+  return oc

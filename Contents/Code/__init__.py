@@ -2,6 +2,7 @@ NAME = 'Academic Earth'
 ART = 'art-default.jpg'
 ICON = 'icon-default.png'
 ICON_SEARCH = 'icon-search.png'
+ICON_MORE = "icon-more.png"
 
 BASE_URL = "http://www.academicearth.org"
 SPEAKER_LECTURES = '%s/speakers/ajax_speakers_get_more_lectures/%%s/%%d' % BASE_URL
@@ -33,67 +34,88 @@ def MainMenu():
   oc.add(DirectoryObject(key = Callback(Subjects), title = 'Subjects'))
   oc.add(DirectoryObject(key = Callback(Universities), title = 'Universities'))
   oc.add(DirectoryObject(key = Callback(Instructors), title = 'Instructors'))
-  oc.add(SearchDirectoryObject(identifier="com.plexapp.plugins.academicearth", title = "Search...", prompt = "Search for Videos", thumb = R(ICON_SEARCH)))
+  # Search disabled for now since the search function doesn't work on the site itself
+  #oc.add(SearchDirectoryObject(identifier="com.plexapp.plugins.academicearth", title = "Search...", prompt = "Search for Videos", thumb = R(ICON_SEARCH)))
   return oc
 
 ####################################################################################################
+#ok
 def Subjects():
 
-  oc = ObjectContainer(title2 = "Subjects")
-  page = HTML.ElementFromURL('http://academicearth.org/subjects/')
+	oc = ObjectContainer(title2 = "Subjects")
+	page = HTML.ElementFromURL(BASE_URL + "/subjects/")
 
-  for subject in page.xpath("//a[@class='subj-links']"):
-    title = subject.xpath(".//div/text()")[0].strip()
-    url = BASE_URL + subject.get('href')
+	for subject in page.xpath("//div[@class='menu']"):
+		title = subject.xpath(".//a/text()")[0].strip()
+	
+		# We don't support Online Degrees and filter out subjects itself
+		if 'Subjects' in title:
+			continue
+	
+		oc.add(DirectoryObject(key = Callback(SubCatagory, title=title), title=title))
 
-    # We don't support Online Degrees
-    if '/onlinedegreeprograms' in url:
-      continue
-
-    oc.add(DirectoryObject(key = Callback(Subject, title=title, url=url), title=title))
-
-  return oc
+	return oc
 
 ####################################################################################################
-def Subject(title, url, page=1):
+#ok
+def SubCatagory(title):
 
-  oc = ObjectContainer(title2 = title)
-  content = HTML.ElementFromURL('%s/page:%d' % (url, page))
-
-  for course in content.xpath("//div[@id='tab_content']//div[@class='info']/.."):
-    course_url = BASE_URL + course.xpath(".//a[@class='thumb']")[0].get('href')
-    course_title = course.xpath(".//img[not(@class='play-icon')]")[0].get('alt')
-    thumb = course.xpath(".//div[@class='thumb']//img[not(@class='play-icon')]")[0].get('src')
-    if thumb.find('http://') == -1:
-        thumb = BASE_URL + thumb
-   
-    summary = course.xpath(".//div[@class='info']//div/a[1]")[0].text
+	oc = ObjectContainer(title2 = title)
 	
-    if '/courses/' in course_url:
-      oc.add(DirectoryObject(
-        key = Callback(Lectures, url=course_url, title=title),
-        title = course_title,
-        summary = summary,
-        thumb = thumb
-      ))
-    else:
-      oc.add(VideoClipObject(
-        url = course_url,
-        title = course_title,
-        summary = summary,
-        thumb = thumb
-      ))
+	page = HTML.ElementFromURL(BASE_URL + "/subjects/")
+	
+	for sub in page.xpath("//div[@class='menu']"):
+		subtitle = sub.xpath(".//a/text()")[0].strip()
+		if subtitle == title:
+			for subcata in sub.xpath(".//div/a"):
+				subcatatitle = subcata.xpath(".//text()")[0].strip()
+				subcatalink  = BASE_URL + subcata.xpath(".")[0].get('href')
+				
+				oc.add(DirectoryObject(key = Callback(ClipsperCatagory, url=subcatalink, title=subcatatitle), title=subcatatitle))
+		
+	return oc
+	
+####################################################################################################
+#ok
+def ClipsperCatagory(url, title, pagenr=1):
 
-  if len(content.xpath('//a/span[text()="next page"]')) > 0:
-    oc.add(DirectoryObject(key = Callback(Subject, title=title, url=url, page=page+1), title='Next ...'))
+	oc = ObjectContainer(title2=title)
+	
+	page = HTML.ElementFromURL('%s/page:%d' % (url, pagenr))
+	
+	for subject in page.xpath("//div[@class='lecture']"):
+		lectureurl = BASE_URL + subject.xpath(".//a")[0].get('href')
+		title = subject.xpath(".//a/h3/text()")[0]
+		thumb = subject.xpath(".//a/img")[1].get('src')
 
-  return oc
+		oc.add(EpisodeObject(
+			url = lectureurl,
+			title = title,
+			show = title,
+			thumb = thumb
+    ))
 
+	if len(page.xpath('//a/span[@class="next"]')) > 0:
+		oc.add(DirectoryObject(key=Callback(UniversitySubjects, url=url, pagenr=pagenr+1), title='More', thumb=R(ICON_MORE)))
+	
+	return oc
+	
 ####################################################################################################
 def Lectures(url, title):
 
   oc = ObjectContainer(title2=title)
-  page = HTML.ElementFromURL(url)
+
+  # It's possible that the given lecture URL will attempt to redirect to a new 'degree' section of 
+  # their site. This requires separate authentication but is not supported by this plugin. We'll
+  # therefore just filter these out.
+  try: 
+    page = HTML.ElementFromURL(url, follow_redirects = False)
+  except Ex.RedirectError, e: 
+    if e.location.startswith("http://academicearth.degreeamerica.com"):
+      oc	= ObjectContainer(header = "No Videos", message = "There are no available videos")
+      return oc
+    else:
+      page = HTML.ElementFromURL(url)
 
   for lecture in page.xpath("//div[@class='results-list']//li[@class='clearfix']"):
     lecture_url = BASE_URL + lecture.xpath(".//a")[0].get('href')
@@ -121,72 +143,81 @@ def Lectures(url, title):
 
   return oc
 
-####################################################################################################
-def Universities():
+######################################################z##############################################
+#ok
+def Universities(pagenr=1):
 
-  oc = ObjectContainer(title2 = "Universities")
-  page = HTML.ElementFromURL('http://academicearth.org/universities/')
-  university_section = page.xpath("//div[contains(@class, 'box-border-main')]")[0]
+	oc = ObjectContainer(title2 = 'Universities')
+	page = HTML.ElementFromURL('%s/universities/page:%d' % (BASE_URL, pagenr))
+	university_section = page.xpath('//div[@class="lectureVideosIndex"]/div[@class="items"]')[0]
+	for university in university_section.xpath('.//div'):
+		url = BASE_URL + university.xpath('.//a')[0].get('href')
+		title = university.xpath('.//a/text()')[1].strip()
+		oc.add(DirectoryObject(key = Callback(UniversitySubjects, url = url), title = title))
 
-  for university in university_section.xpath(".//a[@class='subj-links']"):
-    url = BASE_URL + university.get('href')
-    title = university.xpath(".//div/text()")[0].strip()
-    oc.add(DirectoryObject(key = Callback(UniversitySubjects, url = url), title = title))
-
-  return oc
-
-####################################################################################################
-def UniversitySubjects(url):
-
-  oc = ObjectContainer(title2 = "Subjects")
-  page = HTML.ElementFromURL(url)
-
-  for subject in page.xpath("//div[@class='tab-container']//li"):
-    url = BASE_URL + subject.xpath(".//a")[0].get('href')
-    title = subject.xpath(".//a/text()")[0]
-    oc.add(DirectoryObject(key = Callback(Subject, title=title, url=url), title=title))
-
-  return oc
+	if len(page.xpath('//a/span[@class="next"]')) > 0:
+		oc.add(DirectoryObject(key=Callback(Universities, pagenr=pagenr+1), title='More', thumb=R(ICON_MORE)))
+	
+	return oc
 
 ####################################################################################################
-def Instructors():
+#ok
+def UniversitySubjects(url, pagenr=1):
 
-  oc = ObjectContainer(title2 = "Instructors")
-  page = HTML.ElementFromURL('http://academicearth.org/speakers/')
+	oc = ObjectContainer(title2 = 'Subjects')
+	
+	page = HTML.ElementFromURL('%s/page:%d' % (url, pagenr))
+	
+	for subject in page.xpath("//div[@class='lecture']"):
+		lectureurl = BASE_URL + subject.xpath(".//a")[0].get('href')
+		title = subject.xpath(".//a/h3/text()")[0]
+		thumb = subject.xpath(".//a/img")[1].get('src')
 
-  for instructor_initial in page.xpath("//div[@class='tab-container']//a[contains(@class, 'tab-details-link')]"):
-    url = BASE_URL + instructor_initial.get('href')
-    title = instructor_initial.text
-
-    if 'All Names' in title:
-      continue
-
-    oc.add(DirectoryObject(key = Callback(InstructorsOfLetter, title=title, url=url), title=title))
-
-  return oc
-
-####################################################################################################
-def InstructorsOfLetter(title, url, page=1):
-
-  oc = ObjectContainer(title2 = title)
-  content = HTML.ElementFromURL('%s/page:%d' % (url, page))
-  instructor_section = content.xpath("//div[@class='tab-container']/div")[2]
-
-  for instructor in instructor_section.xpath(".//a"):
-    instructor_url = BASE_URL + instructor.get('href')
-    instructor_title = instructor.xpath('.//div/text()')[0]
-    summary = instructor.xpath('.//div/text()')[1]
-
-    oc.add(DirectoryObject(
-      key = Callback(InstructorsVideos, url=instructor_url, instructor=instructor_title),
-      title = instructor_title,
-      summary = summary
+		oc.add(EpisodeObject(
+			url = lectureurl,
+			title = title,
+			show = title,
+			thumb = thumb
     ))
 
-  if len(content.xpath('//a/span[text()="next page"]')) > 0:
-    oc.add(DirectoryObject(key = Callback(InstructorsOfLetter, title=title, url=url, page=page+1), title='Next ...'))
+	if len(page.xpath('//a/span[@class="next"]')) > 0:
+		oc.add(DirectoryObject(key=Callback(UniversitySubjects, url=url, pagenr=pagenr+1), title='More', thumb=R(ICON_MORE)))
+	
+	return oc
 
-  return oc
+####################################################################################################
+#ok
+def Instructors():
+
+	oc = ObjectContainer(title2 = "Instructors")
+	page = HTML.ElementFromURL(BASE_URL + '/speakers/')
+
+	for instructor_initial in page.xpath("//div[@class='add-link']//div/a"):
+		url = BASE_URL + instructor_initial.get('href')
+		title = instructor_initial.text
+		Log.Debug(url)
+		oc.add(DirectoryObject(key = Callback(InstructorsOfLetter, title=title, url=url), title=title))
+
+	return oc
+
+####################################################################################################
+#ok
+def InstructorsOfLetter(title, url, pagenr=1):
+
+	oc = ObjectContainer(title2 = title)
+	content = HTML.ElementFromURL('%s/page:%d' % (url, pagenr))
+  
+  	for instructor in content.xpath("//div[@class='blue-hover']"):
+		instructor_url = BASE_URL + instructor.xpath(".//a")[0].get('href')
+		instructor_title = instructor.xpath('.//a/div/text()')[0].strip()
+		summary = instructor.xpath('.//a/div/text()')[1]
+
+		oc.add(DirectoryObject(key = Callback(InstructorsVideos, url=instructor_url, instructor=instructor_title), title=instructor_title, summary=summary))
+		
+	if len(content.xpath('//a/span[@class="next"]')) > 0:
+		oc.add(DirectoryObject(key=Callback(InstructorsOfLetter, title=title, url=url, pagenr=pagenr+1), title='More', thumb=R(ICON_MORE)))
+
+	return oc
 
 ####################################################################################################
 def InstructorsVideos(url, instructor):
@@ -198,7 +229,9 @@ def InstructorsVideos(url, instructor):
     course_url = BASE_URL + course.xpath(".//a")[0].get('href')
     course_title = course.xpath(".//div[@class='description']/h4/a/text()")[0]
     summary = course.xpath(".//span[@class='org']/text()")[0]
-    thumb = BASE_URL + course.xpath(".//div[@class='description-thumb']//img")[0].get('src')
+    thumb = course.xpath(".//div[@class='description-thumb']//img")[0].get('src')
+    if thumb.find('http://') == -1:
+        thumb = BASE_URL + thumb  
 
     oc.add(DirectoryObject(
       key = Callback(Lectures, url=course_url, title=course_title),
@@ -222,7 +255,9 @@ def InstructorsVideos(url, instructor):
       lecture_url = BASE_URL + lecture.xpath(".//a")[0].get('href')
       episode_title = lecture.xpath(".//div[@class='description']/h4/a/text()")[0]
       summary = lecture.xpath(".//span[@class='org']/text()")[0].strip(' /')
-      thumb = BASE_URL + lecture.xpath(".//img[contains(@class, 'thumb')]")[0].get('src')
+      thumb = lecture.xpath(".//img[contains(@class, 'thumb')]")[0].get('src')
+      if thumb.find('http://') == -1:
+        thumb = BASE_URL + thumb  
 
       oc.add(EpisodeObject(
         url = lecture_url,
@@ -235,6 +270,6 @@ def InstructorsVideos(url, instructor):
 
   # It seems that some advertised lecturers don't actually have any videos available
   if len(oc) == 0:
-    return MessageContainer("Error", "There are no lecutures currently available.")
-      
+      oc = ObjectContainer(header = "Error", message = "There are no lecutures currently available")
+          
   return oc

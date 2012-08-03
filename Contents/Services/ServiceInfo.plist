@@ -6,6 +6,10 @@
 	<dict>
 		<key>Academic Earth</key>
 		<dict>
+			<key>TestQueries</key>
+			<array>
+				<string>maths</string>
+			</array>
 		</dict>
 	</dict>
 </dict>
